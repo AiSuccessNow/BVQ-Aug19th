@@ -52,17 +52,31 @@
     .help-box{background:var(--card);border:1px solid #243142;padding:12px;border-radius:12px;margin-top:8px;display:none;}
     .verse{background:#0f1a2a;border:1px solid #243e64;padding:12px;border-radius:12px;margin-top:10px;white-space:pre-wrap;line-height:1.4;}
     .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:var(--toast);border:1px solid var(--toast-b);color:#cfe3ff;padding:8px 12px;border-radius:10px;font-size:14px;display:none;z-index:9999;}
-    footer{margin-top:10px;font-size:12px;color:#9db7da;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
-    @media (max-width: 480px){
-      :root{ --key-pad:4px; --key-font:12px; }
-      .kbd{ gap:6px; } .key{ border-radius:8px; }
     header {display: flex;justify-content: center;align-items: center;min-height: 160px; /* adjust as needed */} 
+    footer{margin-top:10px;font-size:12px;color:#9db7da;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+    @media (max-width: 480px){:root{ --key-pad:4px; --key-font:12px; }
+      .kbd{ gap:6px; } .key{ border-radius:8px; }
+    /* Footer box */  /* subtle panel */
+    .site-footer {background: #f8f9fb;border-top: 1px solid #e5e7eb;padding: 16px 12px;}
+
+    /* Center the content in the footer */ /* stack pill above buttons */ /* center horizontally */
+    .site-footer.controls {max-width: 720px;margin: 0 auto;display: flex;flex-direction: column;align-items: center;gap: 10px;text-align: center;}
+
+   /* Center the buttons as a group */ /* space between buttons */
+   .site-footer .btns {display: flex;justify-content: center;align-items: center;gap: 12px;flex-wrap: wrap; /* wrap nicely on small screens */}
+
+  /* Optional: quick styles for the pill and buttons */
+    .pill {padding: 6px 10px;border-radius: 999px;background: #eef2ff;color: #3730a3;font-size: 0.9rem;}
+    .btn {padding: 8px 14px;border-radius: 8px;border: 1px solid #d1d5db;background: white;cursor: pointer;font: inherit;}
+    .btn.secondary {background: #f3f4f6;}
+    .btn:hover { filter: brightness(0.98);}
+   
     }
   </style>
 </head>
 <body>
   <div class="app">
-    <header> style="text-align:center;">
+    <header>
       <h1>FUN Bible Game</h1>
     </header>
 

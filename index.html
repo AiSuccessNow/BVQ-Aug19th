@@ -22,7 +22,7 @@
     :root{
       --bg:#0b0f14; --card:#121821; --tile:#1a2430; --text:#e7eef7; --muted:#91a0b6;
       --correct:#2ea44f; --present:#c6a700; --absent:#2d3a4a; --accent:#4ea1f3;
-      --tile-size:44px; --tile-font:16px; --gap:6px; --key-pad:8px; --key-font:14px;
+      --tile-size:44px; --tile-font:20px; --gap:6px; --key-pad:8px; --key-font:18px;
       --toast:#0f1a2a; --toast-b:#243e64;
     }
     html,body{height:100%}
@@ -96,8 +96,16 @@
 
     <div id="verseBox" class="verse" style="display:none;"></div>
 
-    <footer>
+    <footer class="site-footer">
       <span>Your donations will support ongoing development of the <b>BibleVerseQuest</b>. Thank you!</span>
+      <div class="controls">
+        <span id="dailyTag" class="pill">One puzzle per day</span>
+
+       <div class="btns">
+        <button class="btn secondary" id="shareBtn" type="button" title="Share today’s result">Share</button>
+        <button class="btn" id="helpBtn" type="button">Help</button>
+       </div>
+      </div>
     </footer>
   </div>
 

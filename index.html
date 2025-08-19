@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Meta -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BibleVerseQuest — Daily</title>
+  <meta name="description" content="Bible-themed Wordle-like. Probe with any 5-letter guess; solve the KJV answer to reveal the verse." />
+  <meta name="theme-color" content="#0b0f14" />
+
+  <!-- PWA manifest (relative paths make it work under /<repo>/) -->
+  <link rel="manifest" href="./manifest.webmanifest" />
+
+  <!-- (Optional) Analytics provider: uncomment ONE if you use it -->
+  <!-- Plausible: replace YOUR-DOMAIN.TLD with username.github.io or your custom domain -->
+  <!-- <script defer data-domain="YOUR-DOMAIN.TLD" src="https://plausible.io/js/script.js"></script> -->
+  <!-- Umami (hosted) -->
+  <!-- <script async src="https://us.umami.is/script.js" data-website-id="YOUR-UMAMI-SITE-ID"></script> -->
+
+  <!-- Styles: minimal, responsive, accessible defaults -->
+  <style>
+    :root{
+      --bg:#0b0f14; --card:#121821; --tile:#1a2430; --text:#e7eef7; --muted:#91a0b6;
+      --correct:#2ea44f; --present:#c6a700; --absent:#2d3a4a; --accent:#4ea1f3;
+      --tile-size:44px; --tile-font:16px; --gap:6px; --key-pad:8px; --key-font:14px;
+      --toast:#0f1a2a; --toast-b:#243e64;
+    }
+    html,body{height:100%}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text);display:flex;align-items:center;justify-content:center;}
+    .app{width:100%;max-width:760px;padding:20px;}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px;flex-wrap:wrap;}
+    h1{font-size:22px;letter-spacing:0.5px;margin:0;}
+    .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700;background:#11223a;color:#b5d4ff;border:1px solid #244a7a;}
+    .board{display:grid;grid-template-rows:repeat(6,1fr);gap:var(--gap);margin:16px 0 12px;justify-content:center;}
+    .row{display:grid;grid-template-columns:repeat(5,var(--tile-size));gap:var(--gap);justify-content:center;}
+    .tile{width:var(--tile-size);height:var(--tile-size);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:var(--tile-font);border-radius:10px;background:var(--tile);color:var(--text);text-transform:uppercase;border:1px solid #243142;}
+    .tile.revealed.correct{background:var(--correct);border-color:var(--correct);}
+    .tile.revealed.present{background:var(--present);border-color:var(--present);}
+    .tile.revealed.absent{background:var(--absent);border-color:var(--absent);}
+    .kbd{display:grid;grid-template-columns:repeat(10,1fr);gap:8px;user-select:none;margin-bottom:12px;}
+    .key{background:var(--card);color:var(--text);border:1px solid #243142;padding:var(--key-pad) 0;border-radius:10px;text-align:center;cursor:pointer;font-weight:600;outline:none;font-size:var(--key-font);}
+    .key.wide{grid-column:span 2;}
+    .key[data-state="correct"]{background:var(--correct);border-color:var(--correct);}
+    .key[data-state="present"]{background:var(--present);border-color:var(--present);}
+    .key[data-state="absent"]{background:var(--absent);border-color:var(--absent);}
+    .bar{background:var(--card);border:1px solid #243142;padding:10px 12px;border-radius:12px;font-size:14px;color:var(--muted);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+    .msgline{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+    .btn{background:var(--accent);color:#001730;border:none;padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:700;}
+    .btn.secondary{background:#6fd1ff;color:#00324d;}
+    .small{font-size:12px;color:var(--muted);margin-top:8px;}
+    .help-box{background:var(--card);border:1px solid #243142;padding:12px;border-radius:12px;margin-top:8px;display:none;}
+    .verse{background:#0f1a2a;border:1px solid #243e64;padding:12px;border-radius:12px;margin-top:10px;white-space:pre-wrap;line-height:1.4;}
+    .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:var(--toast);border:1px solid var(--toast-b);color:#cfe3ff;padding:8px 12px;border-radius:10px;font-size:14px;display:none;z-index:9999;}
+    footer{margin-top:10px;font-size:12px;color:#9db7da;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+    @media (max-width: 480px){
+      :root{ --key-pad:4px; --key-font:12px; }
+      .kbd{ gap:6px; } .key{ border-radius:8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>BibleVerseQuest — Daily</h1>
+      <div class="controls">
+        <span id="dailyTag" class="pill">One puzzle per day</span>
+        <button class="btn secondary" id="shareBtn" type="button" title="Share today’s result">Share</button>
+        <button class="btn" id="helpBtn" type="button">Help</button>
+      </div>
+    </header>
+
+    <div class="board" id="board" role="grid" aria-label="Game board"></div>
+    <div class="kbd" id="kbd" aria-label="On-screen keyboard"></div>
+
+    <div class="bar" id="status">
+      <div class="msgline">
+        <span id="msg">Any 5-letter guess is accepted for clues. Solve the real KJV answer.</span>
+        <span id="countdown" class="small"></span>
+      </div>
+    </div>
+
+    <div class="help-box" id="helpBox">
+      <b>How to play:</b> Any 5-letter guess is allowed; colors reveal letter positions. You still need the real KJV word to win and reveal a full verse.
+    </div>
+
+    <div id="verseBox" class="verse" style="display:none;"></div>
+
+    <footer>
+      <span>Donations support ongoing development of <b>BibleVerseQuest</b>. Thank you!</span>
+    </footer>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!-- App entry (native ES modules) -->
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

@@ -8,7 +8,7 @@ import { initBoard, drawLetters } from './ui/board.js';
 import { initKeyboard } from './ui/keyboard.js';
 import { buildShareGrid, showToast, startCountdown, makeStartMarker, submit, handleInput } from './game.js';
 
-/* ---- Error surfacing (place right after imports) ---- */
+/* ---- Error surfacing ---- */
 window.onerror = (msg, src, line, col, err) => {
   console.error('[AppError]', msg, src, line, col, err);
   try { showToast(document.getElementById('toast'), String(msg)); } catch {}
@@ -17,8 +17,9 @@ window.onunhandledrejection = (e) => {
   console.error('[UnhandledRejection]', e.reason);
   try { showToast(document.getElementById('toast'), 'Something went wrong.'); } catch {}
 };
-// ---------- DOM (safe) ----------
-function $(id){ return document.getElementById(id); }
+
+/* ---- DOM (safe) ---- */
+const $ = (id) => document.getElementById(id);
 
 const boardEl     = $('board');
 const kbdEl       = $('kbd');
@@ -30,53 +31,7 @@ const verseBox    = $('verseBox');
 const shareBtn    = $('shareBtn');
 const toastEl     = $('toast');
 
-// Ensure required footer controls exist (creates them if missing)
-function ensureNewGameButton() {
-  let btn = document.getElementById('newGameBtn');
-  if (!btn) {
-    btn = document.createElement('button');
-    btn.id = 'newGameBtn';
-    btn.className = 'btn primary';
-    btn.type = 'button';
-    btn.textContent = 'New Game';
-
-    // Prefer the footer button row if present
-    const btnRow =
-      (document.getElementById('shareBtn')?.parentElement) ||
-      document.querySelector('.site-footer .btns') ||
-      document.body;
-
-    btnRow.appendChild(btn);
-  }
-  return btn;
-}
-
-function ensureQuotaMsgEl() {
-  let el = document.getElementById('quotaMsg');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'quotaMsg';
-    el.className = 'quota-msg';
-
-    const btnRow =
-      (document.getElementById('shareBtn')?.parentElement) ||
-      document.querySelector('.site-footer .btns') ||
-      document.body;
-
-    btnRow.appendChild(el);
-  }
-  return el;
-}
-
-/* Paste the two helper functions here */
-function ensureNewGameButton() { /* ...as given... */ }
-function ensureQuotaMsgEl()   { /* ...as given... */ }
-
-// Use them:
-const newGameBtn = ensureNewGameButton();
-const quotaMsgEl = ensureQuotaMsgEl();
-
-// Create/ensure a "New Game" button (append next to Share or footer .btns)
+/* Ensure footer controls exist (self-healing if missing in HTML) */
 function ensureNewGameButton() {
   let btn = $('newGameBtn');
   if (!btn) {
@@ -85,30 +40,24 @@ function ensureNewGameButton() {
     btn.className = 'btn primary';
     btn.type = 'button';
     btn.textContent = 'New Game';
-
     const btnRow =
       (shareBtn && shareBtn.parentElement) ||
       document.querySelector('.site-footer .btns') ||
       document.body;
-
     btnRow.appendChild(btn);
   }
   return btn;
 }
-
-// Create/ensure a quota/reset message container
 function ensureQuotaMsgEl() {
   let el = $('quotaMsg');
   if (!el) {
     el = document.createElement('div');
     el.id = 'quotaMsg';
     el.className = 'quota-msg';
-
     const btnRow =
       (shareBtn && shareBtn.parentElement) ||
       document.querySelector('.site-footer .btns') ||
       document.body;
-
     btnRow.appendChild(el);
   }
   return el;
@@ -117,7 +66,7 @@ function ensureQuotaMsgEl() {
 const newGameBtn = ensureNewGameButton();
 const quotaMsgEl = ensureQuotaMsgEl();
 
-// ---------- Analytics ----------
+/* ---- Analytics ---- */
 initInstallAnalytics((which) => {
   if (which === 'INSTALL_SHOWN') track(EVT.INSTALL_SHOWN);
   if (which === 'INSTALLED')     track(EVT.INSTALLED);
@@ -126,41 +75,39 @@ document.addEventListener('DOMContentLoaded', () => {
   track(EVT.APP_LOADED, { build: 'BVQ-v1.0.0', lang: navigator.language });
 });
 
-// ---------- State (per day) ----------
+/* ---- State (per day) ---- */
 const maxRows  = 6, size = 5;
 const todayKey = dateKey();
 const state    = store.load();
 const day      = store.ensureDay(state, todayKey);
 
-// DAILY TARGET (unchanged: same daily word)
-const idx     = dailyIndex(new Date(), WORDS.length);
-const target  = WORDS[idx];
+/* Daily target word */
+const idx    = dailyIndex(new Date(), WORDS.length);
+const target = WORDS[idx];
 
-// --- Daily play quota (count on START) ---
+/* ---- Daily quota: count on START ---- */
 const MAX_PLAYS = 3;
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
-const FINISH_CLEAR_DELAY_MS = 1200; // time to let users see result/verse before clearing
+const FINISH_CLEAR_DELAY_MS = 1200;     // show result briefly before clearing
 
 // Initialize new fields if missing
-if (typeof day.playCount !== 'number') day.playCount = 0;
+if (typeof day.playCount !== 'number')        day.playCount = 0;
 if (typeof day.attemptStartedAt !== 'number') day.attemptStartedAt = 0;
-if (typeof day.lastActivityAt !== 'number') day.lastActivityAt = 0;
-if (typeof day.expired !== 'boolean') day.expired = false;
+if (typeof day.lastActivityAt !== 'number')   day.lastActivityAt = 0;
+if (typeof day.expired !== 'boolean')         day.expired = false;
 store.save(state);
 
 function playsRemaining() { return Math.max(0, MAX_PLAYS - (day.playCount || 0)); }
-function nextResetDate() { const d = new Date(); d.setHours(24, 0, 0, 0); return d; }
-function formatTime(d) { return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }); }
+function nextResetDate()  { const d = new Date(); d.setHours(24, 0, 0, 0); return d; }
+function formatTime(d)    { return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }); }
 function hasActiveAttempt() {
-  // Active if started, not finished, not expired, and within idle window
   if (!day.attemptStartedAt) return false;
-  if (day.finished) return false;
-  if (day.expired) return false;
+  if (day.finished || day.expired) return false;
   const last = day.lastActivityAt || day.attemptStartedAt;
   return (Date.now() - last) < IDLE_TIMEOUT_MS;
 }
 
-// ---------- Grid state (restore prior input) ----------
+/* ---- Grid state (restore prior input) ---- */
 let rowRef = { value: Math.min(maxRows, day.rows?.length || 0) };
 let colRef = { value: 0 };
 let guesses = Array.from({ length: maxRows }, (_, r) => {
@@ -168,8 +115,11 @@ let guesses = Array.from({ length: maxRows }, (_, r) => {
   return Array.from({ length: size }, (_, c) => saved[c] || '');
 });
 
-// ---------- Helpers to mutate UI + persist ----------
-function setMessage(t) { msgEl.textContent = t; day.msg = t; store.save(state); }
+/* ---- Helpers (UI + persist) ---- */
+function setMessage(t) {
+  if (msgEl) msgEl.textContent = t;
+  day.msg = t; store.save(state);
+}
 function draw() { drawLetters(guesses); }
 function persistRows(next) { day.rows = next.map(r => r.slice()); store.save(state); }
 function persistReveals(r, result) {
@@ -178,13 +128,11 @@ function persistReveals(r, result) {
   store.save(state);
 }
 function revealVerse() {
+  if (!verseBox) return;
   verseBox.style.display = 'block';
   verseBox.textContent = `${target.r} — ${target.v}`;
 }
-
 function clearGrid({ keepVerse = true } = {}) {
- 
-  // Clear only the board state; do NOT alter day.msg so finish/expiry messages persist
   day.rows = [];
   day.reveals = [];
   store.save(state);
@@ -194,25 +142,16 @@ function clearGrid({ keepVerse = true } = {}) {
   guesses = Array.from({ length: maxRows }, () => Array.from({ length: size }, () => ''));
   draw();
 
-  if (!keepVerse) {
-    verseBox.style.display = 'none';
-  }
+  if (!keepVerse && verseBox) verseBox.style.display = 'none';
 }
 
-
-// --- Input locking & controls ---
+/* ---- Input locking & controls ---- */
 let inputLocked = false;
 function setInputLocked(v) {
   inputLocked = !!v;
   if (kbdEl) kbdEl.style.pointerEvents = v ? 'none' : 'auto';
-  if (newGameBtn) {
-    // While an attempt is active: disable New Game
-    // After finish or expiry: enable if plays remain
-    if (hasActiveAttempt()) newGameBtn.disabled = true;
-    else newGameBtn.disabled = (playsRemaining() === 0);
-  }
+  if (newGameBtn) newGameBtn.disabled = hasActiveAttempt() || (playsRemaining() === 0);
 }
-
 function renderQuotaMessage() {
   if (!quotaMsgEl) return;
   const left = playsRemaining();
@@ -224,8 +163,8 @@ function renderQuotaMessage() {
   if (newGameBtn) newGameBtn.disabled = hasActiveAttempt() || left === 0;
 }
 
-// Clears the board/state for a fresh attempt (same daily word)
-// NOTE: Counts a play *on start*
+/* ---- Attempt lifecycle ---- */
+// Counts a play at start; prepares a fresh board (same daily target)
 function startNewAttempt() {
   if (playsRemaining() === 0) return;
 
@@ -248,28 +187,23 @@ function startNewAttempt() {
   guesses = Array.from({ length: maxRows }, () => Array.from({ length: size }, () => ''));
   draw();
   setMessage('');
-  verseBox.style.display = 'none'; // hide verse until finish
+  if (verseBox) verseBox.style.display = 'none'; // hide verse until finished
 
-  setInputLocked(false);    // unlock typing
-  renderQuotaMessage();     // reflect decremented plays
+  setInputLocked(false);
+  renderQuotaMessage();
 }
 
-// Called once when the game transitions to "finished"
+// Called once when transitioning to finished
 function onGameFinished() {
-  // Count already happened at start. Lock input; show verse via existing flow.
   setInputLocked(true);
   renderQuotaMessage();
 
-  // Briefly show the completed state & verse, then clear the grid (no auto-start)
+  // Briefly show completed grid + verse, then clear board (no auto-start)
   setTimeout(() => {
-    // Keep the verse visible so players can still read it after clear
-    clearGrid({ keepVerse: true });
-
-    // After clear: enable "New Game" if plays remain
+    clearGrid({ keepVerse: true }); // keep verse visible
     if (newGameBtn) newGameBtn.disabled = (playsRemaining() === 0);
   }, FINISH_CLEAR_DELAY_MS);
 }
-
 
 // Expire an in-progress attempt after 30 minutes idle
 function expireAttemptIfIdle() {
@@ -280,109 +214,59 @@ function expireAttemptIfIdle() {
     day.expired = true;
     store.save(state);
 
-    // Lock input, inform the user, and clear the grid (hide verse since it wasn’t solved)
     setInputLocked(true);
-    clearGrid({ keepVerse: false });
+    clearGrid({ keepVerse: false }); // no verse on expiry
     renderQuotaMessage();
 
     setMessage('Your previous game expired after 30 minutes of inactivity. Click “New Game” to try again.');
-    showToast(toastEl, 'Game expired after 30 minutes of inactivity.');
+    try { showToast(toastEl, 'Game expired after 30 minutes of inactivity.'); } catch {}
   }
 }
 
-// Update last-activity timestamp
+// Update last-activity timestamp on interaction
 function bumpActivity() {
   if (!day.attemptStartedAt || day.finished || day.expired) return;
   day.lastActivityAt = Date.now();
   store.save(state);
 }
 
-// Wrap setFinished to trigger finish handling (no counting here)
+// Wrap setFinished to fire finish handling (counting already done on start)
 const setFinished = {
   set(v) {
     const prev = !!day.finished;
     day.finished = !!v;
     store.save(state);
-    if (!prev && day.finished) {
-      onGameFinished();
-    }
+    if (!prev && day.finished) onGameFinished();
   },
   get() { return !!day.finished; }
 };
 
-// ---------- UI init ----------
+/* ---- UI init ---- */
 if (boardEl) {
   initBoard(boardEl, { rows: maxRows, cols: size });
-  draw(); // safe because board is initialized
+  draw();
 }
-
 if (day.msg) setMessage(day.msg);
 if (day.finished) revealVerse();
-
-if (countdownEl) startCountdown(countdownEl);
-
-// Initial quota UI + input lock depending on current state
-renderQuotaMessage();
-setInputLocked(hasActiveAttempt?.() || playsRemaining() === 0);
-
-
-/*if (day.msg) setMessage(day.msg);*/
-function setMessage(t) {
-  if (msgEl) msgEl.textContent = t;
-  day.msg = t; store.save(state);
-}
-
-// Keep verse visible if a previous attempt finished
-/*if (day.finished) revealVerse();*/
-function revealVerse() {
-  if (!verseBox) return;
-  verseBox.style.display = 'block';
-  verseBox.textContent = `${target.r} — ${target.v}`;
-}
-
-// On load, check if an attempt has gone idle and should expire
 expireAttemptIfIdle();
-
-// Show countdown you already have
-startCountdown(countdownEl);
-
-// Initial quota UI + input lock depending on current state
+if (countdownEl) startCountdown(countdownEl);
 renderQuotaMessage();
 setInputLocked(hasActiveAttempt() || playsRemaining() === 0);
 
-// ---------- Input wiring ----------
+/* ---- Input wiring ---- */
 const markStart = makeStartMarker(todayKey);
 
 function processKey(rawKey) {
   if (inputLocked) return;
-  bumpActivity?.(); // okay if undefined in older variant
-  const key = rawKey && rawKey.length === 1 ? rawKey.toUpperCase() : rawKey;
-  handleInput(key, ctx());
-}
-
-if (kbdEl) {
-  initKeyboard(kbdEl, (key) => processKey(key));
-}
-window.addEventListener('keydown', (e) => processKey(e.key));
-
-
-// Gate all input through a small guard so finished/locked state is respected
-function processKey(rawKey) {
-  if (inputLocked) return;
-  // record activity for idle timer
   bumpActivity();
-
   const key = rawKey && rawKey.length === 1 ? rawKey.toUpperCase() : rawKey;
   handleInput(key, ctx());
 }
 
-initKeyboard(kbdEl, (key) => processKey(key));
+if (kbdEl) initKeyboard(kbdEl, (key) => processKey(key));
 window.addEventListener('keydown', (e) => processKey(e.key));
 
-// Periodic idle check (in case tab stays open)
-setInterval(expireAttemptIfIdle, 30 * 1000); // check every 30s
-
-// Also re-check when returning to the tab
+setInterval(expireAttemptIfIdle, 30 * 1000); // periodic idle check
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
     expireAttemptIfIdle();
@@ -391,42 +275,39 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// ---------- Submit wrapper (unchanged) ----------
+/* ---- Submit wrapper ---- */
 function onSubmit() {
   const result = submit({
     row: rowRef.value, col: colRef.value, size, maxRows,
     guesses, target, todayKey, kbdEl,
     setMessage, revealVerse, persistRows, persistReveals, setFinished
   });
-
   if (result.advanced) {
     rowRef.value = result.nextRow;
     colRef.value = 0;
   }
 }
 
-// ---------- Context object for handleInput ----------
+/* ---- Context for handleInput ---- */
 function ctx() {
   return { rowRef, colRef, size, guesses, draw, persistRows, onSubmit, markStart, setFinished };
 }
 
-// ---------- Help toggle ----------
+/* ---- Help toggle ---- */
 if (helpBtn && helpBox) {
   helpBtn.addEventListener('click', () => {
     helpBox.style.display = (helpBox.style.display === 'block') ? 'none' : 'block';
   });
 }
 
-// ---------- "New Game" button wiring ----------
+/* ---- New Game button ---- */
 newGameBtn.addEventListener('click', () => {
-  // Only allow starting if not active and plays remain
   if (hasActiveAttempt()) return;
   if (playsRemaining() === 0) return;
-
   startNewAttempt();
 });
 
-// ---------- Sharing ----------
+/* ---- Sharing ---- */
 if (shareBtn) {
   shareBtn.addEventListener('click', async () => {
     const text = buildShareGrid(todayKey, day.reveals, day.finished);
@@ -453,19 +334,10 @@ if (shareBtn) {
   });
 }
 
-// ---------- PWA Service Worker (subpath-safe for GitHub Pages) ----------
+/* ---- PWA Service Worker ---- */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js', { scope: './' })
       .catch(err => console.warn('SW register failed:', err));
   });
-}
-function setInputLocked(v) {
-  inputLocked = !!v;
-  if (kbdEl) kbdEl.style.pointerEvents = v ? 'none' : 'auto';
-  if (newGameBtn) {
-    const active = hasActiveAttempt();
-    newGameBtn.disabled = active || (playsRemaining() === 0);
-    newGameBtn.style.display = active ? 'none' : 'inline-flex'; // <-- hide while active
-  }
 }

@@ -8,18 +8,29 @@ import { initBoard, drawLetters } from './ui/board.js';
 import { initKeyboard } from './ui/keyboard.js';
 import { buildShareGrid, showToast, startCountdown, makeStartMarker, submit, handleInput } from './game.js';
 
-// ---------- DOM ----------
-const boardEl     = document.getElementById('board');
-const kbdEl       = document.getElementById('kbd');
-const msgEl       = document.getElementById('msg');
-const countdownEl = document.getElementById('countdown');
-const helpBtn     = document.getElementById('helpBtn');
-const helpBox     = document.getElementById('helpBox');
-const verseBox    = document.getElementById('verseBox');
-const shareBtn    = document.getElementById('shareBtn');
-const toastEl     = document.getElementById('toast');
+/* ---- Error surfacing (place right after imports) ---- */
+window.onerror = (msg, src, line, col, err) => {
+  console.error('[AppError]', msg, src, line, col, err);
+  try { showToast(document.getElementById('toast'), String(msg)); } catch {}
+};
+window.onunhandledrejection = (e) => {
+  console.error('[UnhandledRejection]', e.reason);
+  try { showToast(document.getElementById('toast'), 'Something went wrong.'); } catch {}
+};
+// ---------- DOM (safe) ----------
+function $(id){ return document.getElementById(id); }
 
-// Create/ensure a "New Game" button (appends next to Share)
+const boardEl     = $('board');
+const kbdEl       = $('kbd');
+const msgEl       = $('msg');
+const countdownEl = $('countdown');
+const helpBtn     = $('helpBtn');
+const helpBox     = $('helpBox');
+const verseBox    = $('verseBox');
+const shareBtn    = $('shareBtn');
+const toastEl     = $('toast');
+
+// Ensure required footer controls exist (creates them if missing)
 function ensureNewGameButton() {
   let btn = document.getElementById('newGameBtn');
   if (!btn) {
@@ -28,27 +39,77 @@ function ensureNewGameButton() {
     btn.className = 'btn primary';
     btn.type = 'button';
     btn.textContent = 'New Game';
-    if (shareBtn && shareBtn.parentElement) {
-      shareBtn.parentElement.appendChild(btn);
-    } else {
-      document.body.appendChild(btn);
-    }
+
+    // Prefer the footer button row if present
+    const btnRow =
+      (document.getElementById('shareBtn')?.parentElement) ||
+      document.querySelector('.site-footer .btns') ||
+      document.body;
+
+    btnRow.appendChild(btn);
   }
   return btn;
 }
 
-// Create/ensure a quota/reset message container (appends near the buttons)
 function ensureQuotaMsgEl() {
   let el = document.getElementById('quotaMsg');
   if (!el) {
     el = document.createElement('div');
     el.id = 'quotaMsg';
     el.className = 'quota-msg';
-    if (shareBtn && shareBtn.parentElement) {
-      shareBtn.parentElement.appendChild(el);
-    } else {
-      document.body.appendChild(el);
-    }
+
+    const btnRow =
+      (document.getElementById('shareBtn')?.parentElement) ||
+      document.querySelector('.site-footer .btns') ||
+      document.body;
+
+    btnRow.appendChild(el);
+  }
+  return el;
+}
+
+/* Paste the two helper functions here */
+function ensureNewGameButton() { /* ...as given... */ }
+function ensureQuotaMsgEl()   { /* ...as given... */ }
+
+// Use them:
+const newGameBtn = ensureNewGameButton();
+const quotaMsgEl = ensureQuotaMsgEl();
+
+// Create/ensure a "New Game" button (append next to Share or footer .btns)
+function ensureNewGameButton() {
+  let btn = $('newGameBtn');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'newGameBtn';
+    btn.className = 'btn primary';
+    btn.type = 'button';
+    btn.textContent = 'New Game';
+
+    const btnRow =
+      (shareBtn && shareBtn.parentElement) ||
+      document.querySelector('.site-footer .btns') ||
+      document.body;
+
+    btnRow.appendChild(btn);
+  }
+  return btn;
+}
+
+// Create/ensure a quota/reset message container
+function ensureQuotaMsgEl() {
+  let el = $('quotaMsg');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'quotaMsg';
+    el.className = 'quota-msg';
+
+    const btnRow =
+      (shareBtn && shareBtn.parentElement) ||
+      document.querySelector('.site-footer .btns') ||
+      document.body;
+
+    btnRow.appendChild(el);
   }
   return el;
 }
@@ -122,6 +183,7 @@ function revealVerse() {
 }
 
 function clearGrid({ keepVerse = true } = {}) {
+ 
   // Clear only the board state; do NOT alter day.msg so finish/expiry messages persist
   day.rows = [];
   day.reveals = [];
@@ -249,12 +311,34 @@ const setFinished = {
 };
 
 // ---------- UI init ----------
-initBoard(boardEl, { rows: maxRows, cols: size });
-draw();
+if (boardEl) {
+  initBoard(boardEl, { rows: maxRows, cols: size });
+  draw(); // safe because board is initialized
+}
+
 if (day.msg) setMessage(day.msg);
+if (day.finished) revealVerse();
+
+if (countdownEl) startCountdown(countdownEl);
+
+// Initial quota UI + input lock depending on current state
+renderQuotaMessage();
+setInputLocked(hasActiveAttempt?.() || playsRemaining() === 0);
+
+
+/*if (day.msg) setMessage(day.msg);*/
+function setMessage(t) {
+  if (msgEl) msgEl.textContent = t;
+  day.msg = t; store.save(state);
+}
 
 // Keep verse visible if a previous attempt finished
-if (day.finished) revealVerse();
+/*if (day.finished) revealVerse();*/
+function revealVerse() {
+  if (!verseBox) return;
+  verseBox.style.display = 'block';
+  verseBox.textContent = `${target.r} — ${target.v}`;
+}
 
 // On load, check if an attempt has gone idle and should expire
 expireAttemptIfIdle();
@@ -268,6 +352,19 @@ setInputLocked(hasActiveAttempt() || playsRemaining() === 0);
 
 // ---------- Input wiring ----------
 const markStart = makeStartMarker(todayKey);
+
+function processKey(rawKey) {
+  if (inputLocked) return;
+  bumpActivity?.(); // okay if undefined in older variant
+  const key = rawKey && rawKey.length === 1 ? rawKey.toUpperCase() : rawKey;
+  handleInput(key, ctx());
+}
+
+if (kbdEl) {
+  initKeyboard(kbdEl, (key) => processKey(key));
+}
+window.addEventListener('keydown', (e) => processKey(e.key));
+
 
 // Gate all input through a small guard so finished/locked state is respected
 function processKey(rawKey) {
@@ -314,9 +411,11 @@ function ctx() {
 }
 
 // ---------- Help toggle ----------
-helpBtn.addEventListener('click', () => {
-  helpBox.style.display = (helpBox.style.display === 'block') ? 'none' : 'block';
-});
+if (helpBtn && helpBox) {
+  helpBtn.addEventListener('click', () => {
+    helpBox.style.display = (helpBox.style.display === 'block') ? 'none' : 'block';
+  });
+}
 
 // ---------- "New Game" button wiring ----------
 newGameBtn.addEventListener('click', () => {
@@ -328,29 +427,31 @@ newGameBtn.addEventListener('click', () => {
 });
 
 // ---------- Sharing ----------
-shareBtn.addEventListener('click', async () => {
-  const text = buildShareGrid(todayKey, day.reveals, day.finished);
-  try {
-    if (navigator.share) {
-      await navigator.share({ text });
-      track(EVT.SHARE, { puzzle_id: todayKey, method: 'web_share' });
-      return;
+if (shareBtn) {
+  shareBtn.addEventListener('click', async () => {
+    const text = buildShareGrid(todayKey, day.reveals, day.finished);
+    try {
+      if (navigator.share) {
+        await navigator.share({ text });
+        track(EVT.SHARE, { puzzle_id: todayKey, method: 'web_share' });
+        return;
+      }
+    } catch {}
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast(toastEl, 'Copied result to clipboard!');
+      track(EVT.SHARE, { puzzle_id: todayKey, method: 'clipboard' });
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast(toastEl, 'Copied result to clipboard!');
+      track(EVT.SHARE, { puzzle_id: todayKey, method: 'textarea' });
     }
-  } catch {}
-  try {
-    await navigator.clipboard.writeText(text);
-    showToast(toastEl, 'Copied result to clipboard!');
-    track(EVT.SHARE, { puzzle_id: todayKey, method: 'clipboard' });
-  } catch {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select(); document.execCommand('copy');
-    document.body.removeChild(ta);
-    showToast(toastEl, 'Copied result to clipboard!');
-    track(EVT.SHARE, { puzzle_id: todayKey, method: 'textarea' });
-  }
-});
+  });
+}
 
 // ---------- PWA Service Worker (subpath-safe for GitHub Pages) ----------
 if ('serviceWorker' in navigator) {
